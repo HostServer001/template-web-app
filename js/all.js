@@ -7,25 +7,37 @@ let imgNatW = 0, imgNatH = 0, imgDisplayW = 0, imgDisplayH = 0;
 let addMode = false, zoneCounter = 0;
 let dragging = null, resizing = null, rotating = null;
 let dragStart = {}, resizeStart = {}, rotateStart = {};
+let currentImageHash = null;
 
 const img = document.getElementById('meme-img');
 const container = document.getElementById('canvas-container');
+
+// const select = document.getElementById("zone-align");
+
+// Object.entries(alignOptions).forEach(([label, value]) => {
+//   const option = document.createElement("option");
+//   option.value = value;
+//   option.textContent = label;
+//   select.appendChild(option);
+//   });
 
 document.getElementById('file-input').addEventListener('change', e => {
   const file = e.target.files[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = ev => {
-    img.src = ev.target.result;
+  reader.onload = e => {
+    img.src = e.target.result;
     img.style.display = 'block';
     document.getElementById('placeholder').style.display = 'none';
-    img.onload = () => {
+    img.onload = async () => {
       imgNatW = img.naturalWidth; imgNatH = img.naturalHeight;
       imgDisplayW = img.clientWidth; imgDisplayH = img.clientHeight;
       document.getElementById('add-zone-btn').style.display = '';
       document.getElementById('actions').style.display = '';
       document.getElementById('hint').style.display = '';
       document.getElementById('upload-section').querySelector('.btn-primary').textContent = '📁 Change';
+      // MD5 hash
+      currentImageHash = await getMD5(file);
     };
   };
   reader.readAsDataURL(file);
@@ -283,10 +295,20 @@ function updateCount() {
     zones.length + (zones.length === 1 ? ' zone' : ' zones');
 }
 
+function getMD5(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => resolve(SparkMD5.ArrayBuffer.hash(e.target.result));
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(file);
+  });
+}
+
 function exportTemplate() {
   if (zones.length === 0) { showToast('Add at least one text zone!'); return; }
   const output = {
     template_name: 'template_' + Date.now(),
+    image_hash: currentImageHash,
     image_width: imgNatW,
     image_height: imgNatH,
     text_zones: zones.map((z, i) => ({

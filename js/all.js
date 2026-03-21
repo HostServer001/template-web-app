@@ -1,4 +1,3 @@
-
 const tg = window.Telegram?.WebApp;
 if (tg) { tg.ready(); tg.expand(); }
 
@@ -21,22 +20,15 @@ const container = document.getElementById('canvas-container');
 //   select.appendChild(option);
 //   });
 
-// Parse initData from Telegram WebApp
-function getInitDataParams() {
-  if (!tg || !tg.initData) return {};
-  const params = new URLSearchParams(tg.initData);
-  const result = {};
-  for (const [key, value] of params.entries()) {
-    try { result[key] = JSON.parse(value); }
-    catch { result[key] = value; }
-  }
-  return result;
-}
-
-async function loadImageFromInitData() {
-  const params = getInitDataParams();
-  const tempUrl = params.image_url; // key you'll send from Python
+// Read image_url from URL query params (appended by the Telegram bot)
+async function loadImageFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const tempUrl = params.get('image_url');
   if (!tempUrl) return;
+
+  // Hide upload button, show spinner
+  document.getElementById('upload-section').style.display = 'none';
+  document.getElementById('placeholder').innerHTML = '<div class="loader"></div><p>Loading image…</p>';
 
   try {
     const response = await fetch(tempUrl);
@@ -53,7 +45,6 @@ async function loadImageFromInitData() {
       document.getElementById('add-zone-btn').style.display = '';
       document.getElementById('actions').style.display = '';
       document.getElementById('hint').style.display = '';
-      document.getElementById('upload-section').querySelector('.btn-primary').textContent = '📁 Change';
 
       // Generate MD5 from blob
       blob.arrayBuffer().then(buf => {
@@ -62,12 +53,14 @@ async function loadImageFromInitData() {
     };
   } catch (err) {
     console.error('Failed to load image from URL:', err);
+    document.getElementById('placeholder').innerHTML = '<div class="placeholder-icon">⚠️</div><p>Failed to load image</p>';
+    document.getElementById('upload-section').style.display = '';
     showToast('Failed to load image!');
   }
 }
 
 // Run on startup
-loadImageFromInitData();
+loadImageFromUrl();
 
 function getScale() {
   imgDisplayW = img.clientWidth; imgDisplayH = img.clientHeight;

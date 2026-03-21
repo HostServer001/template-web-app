@@ -21,29 +21,53 @@ const container = document.getElementById('canvas-container');
 //   select.appendChild(option);
 //   });
 
-document.getElementById('file-input').addEventListener('change', e => {
-  const file = e.target.files[0];
-  if (!file) return;
+// Parse initData from Telegram WebApp
+function getInitDataParams() {
+  if (!tg || !tg.initData) return {};
+  const params = new URLSearchParams(tg.initData);
+  const result = {};
+  for (const [key, value] of params.entries()) {
+    try { result[key] = JSON.parse(value); }
+    catch { result[key] = value; }
+  }
+  return result;
+}
 
-  // MD5 runs separately, doesn't touch img.onload at all
-  getMD5(file).then(hash => { currentImageHash = hash; });
+async function loadImageFromInitData() {
+  const params = getInitDataParams();
+  const tempUrl = params.image_url; // key you'll send from Python
+  if (!tempUrl) return;
 
-  const reader = new FileReader();
-  reader.onload = ev => {
-    img.src = ev.target.result;
+  try {
+    const response = await fetch(tempUrl);
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+
+    img.src = objectUrl;
     img.style.display = 'block';
     document.getElementById('placeholder').style.display = 'none';
-    img.onload = () => {   // stays sync, no async
+
+    img.onload = () => {
       imgNatW = img.naturalWidth; imgNatH = img.naturalHeight;
       imgDisplayW = img.clientWidth; imgDisplayH = img.clientHeight;
       document.getElementById('add-zone-btn').style.display = '';
       document.getElementById('actions').style.display = '';
       document.getElementById('hint').style.display = '';
       document.getElementById('upload-section').querySelector('.btn-primary').textContent = '📁 Change';
+
+      // Generate MD5 from blob
+      blob.arrayBuffer().then(buf => {
+        currentImageHash = SparkMD5.ArrayBuffer.hash(buf);
+      });
     };
-  };
-  reader.readAsDataURL(file);
-});
+  } catch (err) {
+    console.error('Failed to load image from URL:', err);
+    showToast('Failed to load image!');
+  }
+}
+
+// Run on startup
+loadImageFromInitData();
 
 function getScale() {
   imgDisplayW = img.clientWidth; imgDisplayH = img.clientHeight;

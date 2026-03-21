@@ -182,10 +182,13 @@ function selectZone(id) {
 function showEditor(zone) {
   document.getElementById('zone-editor').classList.add('visible');
   document.getElementById('zone-name').value = zone.name;
-  document.getElementById('zone-align').value = zone.align;
+  const alignEl = document.getElementById('zone-align');
+  if (alignEl) alignEl.value = zone.align;   // won't crash if element missing
   document.getElementById('zone-rotate').value = zone.rotation;
   document.getElementById('rotate-val').textContent = zone.rotation + '°';
 }
+
+
 function hideEditor() { document.getElementById('zone-editor').classList.remove('visible'); }
 
 document.getElementById('zone-name').addEventListener('input', e => {

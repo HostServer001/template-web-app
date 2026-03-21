@@ -21,7 +21,7 @@ const container = document.getElementById('canvas-container');
 //   });
 
 // Read image_url from URL query params (appended by the Telegram bot)
-async function loadImageFromUrl() {
+function loadImageFromUrl() {
   const params = new URLSearchParams(window.location.search);
   const tempUrl = params.get('image_url');
   if (!tempUrl) return;
@@ -30,33 +30,27 @@ async function loadImageFromUrl() {
   document.getElementById('upload-section').style.display = 'none';
   document.getElementById('placeholder').innerHTML = '<div class="loader"></div><p>Loading image…</p>';
 
-  try {
-    const response = await fetch(tempUrl);
-    const blob = await response.blob();
-    const objectUrl = URL.createObjectURL(blob);
+  // Set src directly — avoids CORS (browsers allow cross-origin <img>, not fetch)
+  img.src = tempUrl;
+  img.style.display = 'none'; // keep hidden until loaded
 
-    img.src = objectUrl;
+  img.onload = () => {
     img.style.display = 'block';
     document.getElementById('placeholder').style.display = 'none';
+    imgNatW = img.naturalWidth; imgNatH = img.naturalHeight;
+    imgDisplayW = img.clientWidth; imgDisplayH = img.clientHeight;
+    document.getElementById('add-zone-btn').style.display = '';
+    document.getElementById('actions').style.display = '';
+    document.getElementById('hint').style.display = '';
+    // MD5 not available without fetch — use URL as unique identifier instead
+    currentImageHash = tempUrl;
+  };
 
-    img.onload = () => {
-      imgNatW = img.naturalWidth; imgNatH = img.naturalHeight;
-      imgDisplayW = img.clientWidth; imgDisplayH = img.clientHeight;
-      document.getElementById('add-zone-btn').style.display = '';
-      document.getElementById('actions').style.display = '';
-      document.getElementById('hint').style.display = '';
-
-      // Generate MD5 from blob
-      blob.arrayBuffer().then(buf => {
-        currentImageHash = SparkMD5.ArrayBuffer.hash(buf);
-      });
-    };
-  } catch (err) {
-    console.error('Failed to load image from URL:', err);
+  img.onerror = () => {
     document.getElementById('placeholder').innerHTML = '<div class="placeholder-icon">⚠️</div><p>Failed to load image</p>';
     document.getElementById('upload-section').style.display = '';
     showToast('Failed to load image!');
-  }
+  };
 }
 
 // Run on startup

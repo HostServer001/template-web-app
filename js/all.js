@@ -196,7 +196,7 @@ document.getElementById('zone-name').addEventListener('input', e => {
   const zone = zones.find(z => z.id === selectedId);
   if (zone) { zone.name = e.target.value || 'zone_' + selectedId; reRenderZone(zone); }
 });
-document.getElementById('zone-align').addEventListener('change', e => {
+document.getElementById('zone-align')?.addEventListener('change', e => {
   if (!selectedId) return;
   const zone = zones.find(z => z.id === selectedId);
   if (zone) zone.align = e.target.value;

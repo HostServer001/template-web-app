@@ -43,7 +43,7 @@ function loadImageFromUrl() {
     document.getElementById('actions').style.display = '';
     document.getElementById('hint').style.display = '';
     // MD5 not available without fetch — use URL as unique identifier instead
-    currentImageHash = tempUrl;
+    currentImageHash = SparkMD5.hash(tempUrl);
   };
 
   img.onerror = () => {

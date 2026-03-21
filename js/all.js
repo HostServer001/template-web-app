@@ -24,20 +24,22 @@ const container = document.getElementById('canvas-container');
 document.getElementById('file-input').addEventListener('change', e => {
   const file = e.target.files[0];
   if (!file) return;
+
+  // MD5 runs separately, doesn't touch img.onload at all
+  getMD5(file).then(hash => { currentImageHash = hash; });
+
   const reader = new FileReader();
-  reader.onload = e => {
-    img.src = e.target.result;
+  reader.onload = ev => {
+    img.src = ev.target.result;
     img.style.display = 'block';
     document.getElementById('placeholder').style.display = 'none';
-    img.onload = async () => {
+    img.onload = () => {   // stays sync, no async
       imgNatW = img.naturalWidth; imgNatH = img.naturalHeight;
       imgDisplayW = img.clientWidth; imgDisplayH = img.clientHeight;
       document.getElementById('add-zone-btn').style.display = '';
       document.getElementById('actions').style.display = '';
       document.getElementById('hint').style.display = '';
       document.getElementById('upload-section').querySelector('.btn-primary').textContent = '📁 Change';
-      // MD5 hash
-      currentImageHash = await getMD5(file);
     };
   };
   reader.readAsDataURL(file);

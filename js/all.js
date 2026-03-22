@@ -95,8 +95,26 @@ function buildPresetChips() {
     const chip = document.createElement('button');
     chip.className = 'preset-chip';
     chip.textContent = preset.label;
+
+    let touchStartX = 0, touchStartY = 0, touchMoved = false;
+    chip.addEventListener('touchstart', e => {
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+      touchMoved = false;
+    }, { passive: true });
+    chip.addEventListener('touchmove', e => {
+      if (Math.abs(e.touches[0].clientX - touchStartX) > 6 ||
+          Math.abs(e.touches[0].clientY - touchStartY) > 6) {
+        touchMoved = true;
+      }
+    }, { passive: true });
+    chip.addEventListener('touchend', e => {
+      if (touchMoved) return;
+      e.preventDefault();
+      applyPreset(i);
+    });
     chip.addEventListener('click', () => applyPreset(i));
-    chip.addEventListener('touchend', e => { e.preventDefault(); applyPreset(i); });
+
     scroll.appendChild(chip);
   });
 }

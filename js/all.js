@@ -11,62 +11,175 @@ let currentImageHash = null;
 const img = document.getElementById('meme-img');
 const container = document.getElementById('canvas-container');
 
-// const select = document.getElementById("zone-align");
+// ─────────────────────────────────────────
+// PREDEFINED ZONE PRESETS
+// All coords are expressed as fractions (0..1) of image dimensions
+// so they scale correctly regardless of image size.
+// ─────────────────────────────────────────
+const PRESETS = [
+  {
+    label: '⬆ Top Caption',
+    zones: [
+      { name: 'top_text', x: 0.05, y: 0.02, w: 0.90, h: 0.14 }
+    ]
+  },
+  {
+    label: '⬇ Bottom Caption',
+    zones: [
+      { name: 'bottom_text', x: 0.05, y: 0.84, w: 0.90, h: 0.14 }
+    ]
+  },
+  {
+    label: '↕ Top + Bottom',
+    zones: [
+      { name: 'top_text',    x: 0.05, y: 0.02, w: 0.90, h: 0.14 },
+      { name: 'bottom_text', x: 0.05, y: 0.84, w: 0.90, h: 0.14 }
+    ]
+  },
+  {
+    label: '🔲 2×2 Grid',
+    zones: [
+      { name: 'top_left',     x: 0.02, y: 0.02, w: 0.46, h: 0.46 },
+      { name: 'top_right',    x: 0.52, y: 0.02, w: 0.46, h: 0.46 },
+      { name: 'bottom_left',  x: 0.02, y: 0.52, w: 0.46, h: 0.46 },
+      { name: 'bottom_right', x: 0.52, y: 0.52, w: 0.46, h: 0.46 }
+    ]
+  },
+  {
+    label: '◼ Center Box',
+    zones: [
+      { name: 'center_text', x: 0.10, y: 0.35, w: 0.80, h: 0.30 }
+    ]
+  },
+  {
+    label: '🔛 Full Width Strip',
+    zones: [
+      { name: 'strip_text', x: 0.00, y: 0.42, w: 1.00, h: 0.16 }
+    ]
+  },
+  {
+    label: '↔ Left + Right',
+    zones: [
+      { name: 'left_text',  x: 0.02, y: 0.10, w: 0.44, h: 0.80 },
+      { name: 'right_text', x: 0.54, y: 0.10, w: 0.44, h: 0.80 }
+    ]
+  },
+  {
+    label: '🗨 Speech Bubble',
+    zones: [
+      { name: 'bubble_text', x: 0.30, y: 0.03, w: 0.65, h: 0.22 }
+    ]
+  },
+  {
+    label: '🏷 Label Bottom-Left',
+    zones: [
+      { name: 'label_text', x: 0.03, y: 0.78, w: 0.45, h: 0.18 }
+    ]
+  },
+  {
+    label: '📋 3 Rows',
+    zones: [
+      { name: 'row_1', x: 0.05, y: 0.02,  w: 0.90, h: 0.14 },
+      { name: 'row_2', x: 0.05, y: 0.43,  w: 0.90, h: 0.14 },
+      { name: 'row_3', x: 0.05, y: 0.84,  w: 0.90, h: 0.14 }
+    ]
+  }
+];
 
-// Object.entries(alignOptions).forEach(([label, value]) => {
-//   const option = document.createElement("option");
-//   option.value = value;
-//   option.textContent = label;
-//   select.appendChild(option);
-//   });
+// ─────────────────────────────────────────
+// Build preset chips
+// ─────────────────────────────────────────
+function buildPresetChips() {
+  const scroll = document.getElementById('presets-scroll');
+  PRESETS.forEach((preset, i) => {
+    const chip = document.createElement('button');
+    chip.className = 'preset-chip';
+    chip.textContent = preset.label;
+    chip.addEventListener('click', () => applyPreset(i));
+    chip.addEventListener('touchend', e => { e.preventDefault(); applyPreset(i); });
+    scroll.appendChild(chip);
+  });
+}
+buildPresetChips();
 
-// Read image_url from URL query params (appended by the Telegram bot)
+function applyPreset(index) {
+  if (!img.src || !imgNatW) { showToast('Image not loaded yet'); return; }
+  // Clear existing zones first
+  clearAll(true);
+  const preset = PRESETS[index];
+  preset.zones.forEach(z => {
+    const px = z.x * imgDisplayW;
+    const py = z.y * imgDisplayH;
+    const pw = z.w * imgDisplayW;
+    const ph = z.h * imgDisplayH;
+    addZone(px, py, pw, ph, z.name);
+  });
+  showToast('Applied: ' + preset.label.replace(/^.\s/, ''));
+}
+
+// ─────────────────────────────────────────
+// Image loading — URL only, no file upload
+// ─────────────────────────────────────────
 function loadImageFromUrl() {
   const params = new URLSearchParams(window.location.search);
   const tempUrl = params.get('image_url');
-  if (!tempUrl) return;
 
-  // Hide upload button, show spinner
-  document.getElementById('upload-section').style.display = 'none';
-  document.getElementById('placeholder').innerHTML = '<div class="loader"></div><p>Loading image…</p>';
+  if (!tempUrl) {
+    document.getElementById('placeholder').innerHTML =
+      '<div class="placeholder-icon">⚠️</div><p>No image_url provided</p>';
+    return;
+  }
 
-  // Set src directly — avoids CORS (browsers allow cross-origin <img>, not fetch)
+  document.getElementById('placeholder').innerHTML =
+    '<div class="loader"></div><p>Loading image…</p>';
+
   img.src = tempUrl;
-  img.style.display = 'none'; // keep hidden until loaded
+  img.style.display = 'none';
 
   img.onload = () => {
     img.style.display = 'block';
     document.getElementById('placeholder').style.display = 'none';
-    imgNatW = img.naturalWidth; imgNatH = img.naturalHeight;
-    imgDisplayW = img.clientWidth; imgDisplayH = img.clientHeight;
-    document.getElementById('add-zone-btn').style.display = '';
+    imgNatW = img.naturalWidth;
+    imgNatH = img.naturalHeight;
+    imgDisplayW = img.clientWidth;
+    imgDisplayH = img.clientHeight;
+
+    document.getElementById('top-actions').style.display = '';
+    document.getElementById('presets-section').classList.add('visible');
     document.getElementById('actions').style.display = '';
     document.getElementById('hint').style.display = '';
-    // MD5 not available without fetch — use URL as unique identifier instead
+
     currentImageHash = SparkMD5.hash(tempUrl);
   };
 
   img.onerror = () => {
-    document.getElementById('placeholder').innerHTML = '<div class="placeholder-icon">⚠️</div><p>Failed to load image</p>';
-    document.getElementById('upload-section').style.display = '';
+    document.getElementById('placeholder').innerHTML =
+      '<div class="placeholder-icon">⚠️</div><p>Failed to load image</p>';
     showToast('Failed to load image!');
   };
 }
 
-// Run on startup
 loadImageFromUrl();
 
+// ─────────────────────────────────────────
+// Core helpers
+// ─────────────────────────────────────────
 function getScale() {
-  imgDisplayW = img.clientWidth; imgDisplayH = img.clientHeight;
+  imgDisplayW = img.clientWidth;
+  imgDisplayH = img.clientHeight;
   return { sx: imgNatW / imgDisplayW, sy: imgNatH / imgDisplayH };
 }
 
 function toggleAddMode() {
   addMode = !addMode;
   const btn = document.getElementById('add-zone-btn');
-  btn.textContent = addMode ? '✕ Cancel' : '＋ Add Zone';
-  btn.style.background = addMode ? 'var(--accent2)' : '';
-  btn.style.color = addMode ? '#fff' : '';
+  if (addMode) {
+    btn.textContent = '✕ Cancel';
+    btn.classList.add('cancel-mode');
+  } else {
+    btn.textContent = '＋ Add Zone';
+    btn.classList.remove('cancel-mode');
+  }
   container.style.cursor = addMode ? 'crosshair' : 'default';
 }
 
@@ -86,22 +199,30 @@ function onCanvasDown(e) {
   e.preventDefault();
   const pos = getEventPos(e, container);
   const w = imgDisplayW * 0.35, h = imgDisplayH * 0.12;
-  const x = Math.max(0, Math.min(pos.x - w/2, imgDisplayW - w));
-  const y = Math.max(0, Math.min(pos.y - h/2, imgDisplayH - h));
+  const x = Math.max(0, Math.min(pos.x - w / 2, imgDisplayW - w));
+  const y = Math.max(0, Math.min(pos.y - h / 2, imgDisplayH - h));
   addZone(x, y, w, h);
   if (addMode) toggleAddMode();
 }
 container.addEventListener('mousedown', onCanvasDown);
 container.addEventListener('touchstart', onCanvasDown, { passive: false });
 
-function addZone(px, py, pw, ph) {
+// ─────────────────────────────────────────
+// Zone management
+// ─────────────────────────────────────────
+function addZone(px, py, pw, ph, forceName) {
   zoneCounter++;
   const id = 'z' + zoneCounter;
   const { sx, sy } = getScale();
   const zone = {
-    id, name: 'text_' + zoneCounter, align: 'center', rotation: 0,
-    x: Math.round(px * sx), y: Math.round(py * sy),
-    w: Math.round(pw * sx), h: Math.round(ph * sy)
+    id,
+    name: forceName || ('text_' + zoneCounter),
+    align: 'center',
+    rotation: 0,
+    x: Math.round(px * sx),
+    y: Math.round(py * sy),
+    w: Math.round(pw * sx),
+    h: Math.round(ph * sy)
   };
   zones.push(zone);
   renderZone(zone);
@@ -185,7 +306,10 @@ function selectZone(id) {
   });
   selectedId = id;
   const el = document.getElementById('zone-' + id);
-  if (el) { el.classList.add('selected'); el.querySelector('.zone-label')?.classList.add('selected'); }
+  if (el) {
+    el.classList.add('selected');
+    el.querySelector('.zone-label')?.classList.add('selected');
+  }
   const zone = zones.find(z => z.id === id);
   if (zone) showEditor(zone);
 }
@@ -193,25 +317,20 @@ function selectZone(id) {
 function showEditor(zone) {
   document.getElementById('zone-editor').classList.add('visible');
   document.getElementById('zone-name').value = zone.name;
-  const alignEl = document.getElementById('zone-align');
-  if (alignEl) alignEl.value = zone.align;   // won't crash if element missing
   document.getElementById('zone-rotate').value = zone.rotation;
   document.getElementById('rotate-val').textContent = zone.rotation + '°';
 }
 
-
-function hideEditor() { document.getElementById('zone-editor').classList.remove('visible'); }
+function hideEditor() {
+  document.getElementById('zone-editor').classList.remove('visible');
+}
 
 document.getElementById('zone-name').addEventListener('input', e => {
   if (!selectedId) return;
   const zone = zones.find(z => z.id === selectedId);
   if (zone) { zone.name = e.target.value || 'zone_' + selectedId; reRenderZone(zone); }
 });
-document.getElementById('zone-align')?.addEventListener('change', e => {
-  if (!selectedId) return;
-  const zone = zones.find(z => z.id === selectedId);
-  if (zone) zone.align = e.target.value;
-});
+
 document.getElementById('zone-rotate').addEventListener('input', e => {
   if (!selectedId) return;
   const zone = zones.find(z => z.id === selectedId);
@@ -222,6 +341,9 @@ document.getElementById('zone-rotate').addEventListener('input', e => {
   }
 });
 
+// ─────────────────────────────────────────
+// Drag / Resize / Rotate
+// ─────────────────────────────────────────
 function startDrag(e, id) {
   e.preventDefault(); dragging = id;
   const pos = getEventPos(e, container);
@@ -287,7 +409,6 @@ function onMove(e) {
     const angle = Math.atan2(cp.y - rotateStart.cy, cp.x - rotateStart.cx) * 180 / Math.PI;
     const zone = zones.find(z => z.id === rotating);
     let newRot = rotateStart.initRotation + (angle - rotateStart.startAngle);
-    // Normalize to -180..180
     newRot = ((newRot + 180) % 360 + 360) % 360 - 180;
     zone.rotation = Math.round(newRot);
     reRenderZone(zone);
@@ -300,24 +421,19 @@ function onMove(e) {
 
 function onUp() { dragging = null; resizing = null; rotating = null; }
 
-function clearAll() {
+// ─────────────────────────────────────────
+// Utilities
+// ─────────────────────────────────────────
+function clearAll(silent) {
   zones = []; zoneCounter = 0; selectedId = null; hideEditor();
   document.querySelectorAll('.text-zone').forEach(el => el.remove());
-  updateCount(); showToast('All zones cleared');
+  updateCount();
+  if (!silent) showToast('All zones cleared');
 }
 
 function updateCount() {
   document.getElementById('zone-count').textContent =
     zones.length + (zones.length === 1 ? ' zone' : ' zones');
-}
-
-function getMD5(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = e => resolve(SparkMD5.ArrayBuffer.hash(e.target.result));
-    reader.onerror = reject;
-    reader.readAsArrayBuffer(file);
-  });
 }
 
 function exportTemplate() {
@@ -353,4 +469,6 @@ function showToast(msg) {
   setTimeout(() => t.classList.remove('show'), 2200);
 }
 
-window.addEventListener('resize', () => { if (img.src) zones.forEach(z => reRenderZone(z)); });
+window.addEventListener('resize', () => {
+  if (img.src) zones.forEach(z => reRenderZone(z));
+});

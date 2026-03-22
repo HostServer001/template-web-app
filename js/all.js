@@ -90,32 +90,30 @@ const PRESETS = [
 // Build preset chips
 // ─────────────────────────────────────────
 function buildPresetChips() {
-  const scroll = document.getElementById('presets-scroll');
+  const scrollEl = document.getElementById('presets-scroll');
+  let scrolling = false, scrollTimer = null;
+
+  scrollEl.addEventListener('scroll', () => {
+    scrolling = true;
+    clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(() => { scrolling = false; }, 150);
+  }, { passive: true });
+
   PRESETS.forEach((preset, i) => {
     const chip = document.createElement('button');
     chip.className = 'preset-chip';
     chip.textContent = preset.label;
 
-    let touchStartX = 0, touchStartY = 0, touchMoved = false;
-    chip.addEventListener('touchstart', e => {
-      touchStartX = e.touches[0].clientX;
-      touchStartY = e.touches[0].clientY;
-      touchMoved = false;
-    }, { passive: true });
-    chip.addEventListener('touchmove', e => {
-      if (Math.abs(e.touches[0].clientX - touchStartX) > 6 ||
-          Math.abs(e.touches[0].clientY - touchStartY) > 6) {
-        touchMoved = true;
-      }
-    }, { passive: true });
     chip.addEventListener('touchend', e => {
-      if (touchMoved) return;
-      e.preventDefault();
+      if (scrolling) { e.preventDefault(); return; }
+    }, { passive: false });
+
+    chip.addEventListener('click', () => {
+      if (scrolling) return;
       applyPreset(i);
     });
-    chip.addEventListener('click', () => applyPreset(i));
 
-    scroll.appendChild(chip);
+    scrollEl.appendChild(chip);
   });
 }
 buildPresetChips();

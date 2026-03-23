@@ -66,9 +66,10 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', syste
   background: var(--surface);
   border-top: 1px solid var(--border);
   flex-shrink: 0;
-  /* prevent the panel from ever overflowing the screen */
   overflow-y: auto;
-  max-height: 55vh;   /* hard cap so panel never swallows too much screen */
+  /* hard cap: panel can never consume more than 45% of screen height */
+  max-height: 45vh;
+  max-height: 45dvh;
 }
 
 /* Hint bar */

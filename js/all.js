@@ -1,5 +1,25 @@
 const tg = window.Telegram?.WebApp;
-if (tg) { tg.ready(); tg.expand(); }
+
+// Expand first, then wait for the viewport to fully settle before running layout
+let _appReady = false;
+const _readyCallbacks = [];
+function onAppReady(fn) { if (_appReady) fn(); else _readyCallbacks.push(fn); }
+function _fireReady() { if (_appReady) return; _appReady = true; _readyCallbacks.forEach(f => f()); }
+
+if (tg) {
+  tg.ready();
+  tg.expand();
+  // viewportChanged fires when expansion finishes; isStateStable = true means settled
+  tg.onEvent('viewportChanged', ({ isStateStable }) => {
+    if (isStateStable) _fireReady();
+    // Always re-fit when viewport changes (keyboard, safe area, resize)
+    if (imgNatW) requestAnimationFrame(() => { fitImage(); zones.forEach(z => reRenderZone(z)); });
+  });
+  // Safety fallback: fire after 500 ms in case the event never comes
+  setTimeout(_fireReady, 500);
+} else {
+  _fireReady(); // browser / dev mode
+}
 
 let zones = [], selectedId = null;
 let imgNatW = 0, imgNatH = 0, imgDisplayW = 0, imgDisplayH = 0;
@@ -168,6 +188,13 @@ function loadImageFromUrl() {
     document.getElementById('actions').style.display = '';
     document.getElementById('hint').style.display = '';
 
+    // Bottom panel just grew — re-fit image to new available height
+    requestAnimationFrame(() => {
+      fitImage();
+      imgDisplayW = img.clientWidth;
+      imgDisplayH = img.clientHeight;
+    });
+
     currentImageHash = SparkMD5.hash(tempUrl);
   };
 
@@ -178,7 +205,7 @@ function loadImageFromUrl() {
   };
 }
 
-loadImageFromUrl();
+onAppReady(loadImageFromUrl);
 
 // ─────────────────────────────────────────
 // Core helpers
@@ -338,10 +365,12 @@ function showEditor(zone) {
   document.getElementById('zone-name').value = zone.name;
   document.getElementById('zone-rotate').value = zone.rotation;
   document.getElementById('rotate-val').textContent = zone.rotation + '°';
+  requestAnimationFrame(() => { fitImage(); zones.forEach(z => reRenderZone(z)); });
 }
 
 function hideEditor() {
   document.getElementById('zone-editor').classList.remove('visible');
+  requestAnimationFrame(() => { fitImage(); zones.forEach(z => reRenderZone(z)); });
 }
 
 document.getElementById('zone-name').addEventListener('input', e => {

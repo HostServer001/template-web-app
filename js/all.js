@@ -1,25 +1,5 @@
 const tg = window.Telegram?.WebApp;
-
-// Expand first, then wait for the viewport to fully settle before running layout
-let _appReady = false;
-const _readyCallbacks = [];
-function onAppReady(fn) { if (_appReady) fn(); else _readyCallbacks.push(fn); }
-function _fireReady() { if (_appReady) return; _appReady = true; _readyCallbacks.forEach(f => f()); }
-
-if (tg) {
-  tg.ready();
-  tg.expand();
-  // viewportChanged fires when expansion finishes; isStateStable = true means settled
-  tg.onEvent('viewportChanged', ({ isStateStable }) => {
-    if (isStateStable) _fireReady();
-    // Always re-fit when viewport changes (keyboard, safe area, resize)
-    if (imgNatW) requestAnimationFrame(() => { fitImage(); zones.forEach(z => reRenderZone(z)); });
-  });
-  // Safety fallback: fire after 500 ms in case the event never comes
-  setTimeout(_fireReady, 500);
-} else {
-  _fireReady(); // browser / dev mode
-}
+if (tg) { tg.ready(); tg.expand(); }
 
 let zones = [], selectedId = null;
 let imgNatW = 0, imgNatH = 0, imgDisplayW = 0, imgDisplayH = 0;
@@ -28,134 +8,134 @@ let dragging = null, resizing = null, rotating = null;
 let dragStart = {}, resizeStart = {}, rotateStart = {};
 let currentImageHash = null;
 
-const img = document.getElementById('meme-img');
-const container = document.getElementById('canvas-container');
+const img        = document.getElementById('meme-img');
+const container  = document.getElementById('canvas-container');
+const canvasWrap = document.getElementById('canvas-wrap');
+const appEl      = document.getElementById('app');
 
 // ─────────────────────────────────────────
-// PREDEFINED ZONE PRESETS
-// All coords are expressed as fractions (0..1) of image dimensions
-// so they scale correctly regardless of image size.
+// VIEWPORT HEIGHT
+// Telegram reports the real usable height via viewportStableHeight.
+// We set it as an explicit px height on #app so the browser doesn't
+// use its own (wrong) 100vh calculation.
+// ─────────────────────────────────────────
+function applyViewportHeight() {
+  const h = (tg && tg.viewportStableHeight > 100) ? tg.viewportStableHeight
+           : (tg && tg.viewportHeight       > 100) ? tg.viewportHeight
+           : window.innerHeight;
+  appEl.style.height = h + 'px';
+}
+
+applyViewportHeight();
+
+if (tg) {
+  tg.onEvent('viewportChanged', () => {
+    applyViewportHeight();
+    scheduleRefit();
+  });
+}
+window.addEventListener('resize', () => {
+  applyViewportHeight();
+  scheduleRefit();
+});
+
+// ─────────────────────────────────────────
+// REFIT — sizes the image to exactly fill canvas-wrap
+// Debounced via rAF so layout has settled before we measure
+// ─────────────────────────────────────────
+let _refitFrame = null;
+function scheduleRefit() {
+  if (_refitFrame) cancelAnimationFrame(_refitFrame);
+  _refitFrame = requestAnimationFrame(() => {
+    _refitFrame = null;
+    if (!imgNatW || !imgNatH) return;
+    fitImage();
+    zones.forEach(z => reRenderZone(z));
+  });
+}
+
+function fitImage() {
+  const wrapW = canvasWrap.clientWidth;
+  const wrapH = canvasWrap.clientHeight;
+  if (!wrapW || !wrapH || !imgNatW || !imgNatH) return;
+
+  const scale = Math.min(wrapW / imgNatW, wrapH / imgNatH);
+  imgDisplayW = Math.floor(imgNatW * scale);
+  imgDisplayH = Math.floor(imgNatH * scale);
+
+  img.style.width     = imgDisplayW + 'px';
+  img.style.height    = imgDisplayH + 'px';
+  img.style.maxWidth  = 'none';
+  img.style.maxHeight = 'none';
+}
+
+// ─────────────────────────────────────────
+// PRESETS
 // ─────────────────────────────────────────
 const PRESETS = [
-  {
-    label: '⬆ Top Caption',
-    zones: [
-      { name: 'top_text', x: 0.05, y: 0.02, w: 0.90, h: 0.14 }
-    ]
-  },
-  {
-    label: '⬇ Bottom Caption',
-    zones: [
-      { name: 'bottom_text', x: 0.05, y: 0.84, w: 0.90, h: 0.14 }
-    ]
-  },
-  {
-    label: '↕ Top + Bottom',
-    zones: [
-      { name: 'top_text',    x: 0.05, y: 0.02, w: 0.90, h: 0.14 },
-      { name: 'bottom_text', x: 0.05, y: 0.84, w: 0.90, h: 0.14 }
-    ]
-  },
-  {
-    label: '🔲 2×2 Grid',
-    zones: [
-      { name: 'top_left',     x: 0.02, y: 0.02, w: 0.46, h: 0.46 },
-      { name: 'top_right',    x: 0.52, y: 0.02, w: 0.46, h: 0.46 },
-      { name: 'bottom_left',  x: 0.02, y: 0.52, w: 0.46, h: 0.46 },
-      { name: 'bottom_right', x: 0.52, y: 0.52, w: 0.46, h: 0.46 }
-    ]
-  },
-  {
-    label: '◼ Center Box',
-    zones: [
-      { name: 'center_text', x: 0.10, y: 0.35, w: 0.80, h: 0.30 }
-    ]
-  },
-  {
-    label: '🔛 Full Width Strip',
-    zones: [
-      { name: 'strip_text', x: 0.00, y: 0.42, w: 1.00, h: 0.16 }
-    ]
-  },
-  {
-    label: '↔ Left + Right',
-    zones: [
-      { name: 'left_text',  x: 0.02, y: 0.10, w: 0.44, h: 0.80 },
-      { name: 'right_text', x: 0.54, y: 0.10, w: 0.44, h: 0.80 }
-    ]
-  },
-  {
-    label: '🗨 Speech Bubble',
-    zones: [
-      { name: 'bubble_text', x: 0.30, y: 0.03, w: 0.65, h: 0.22 }
-    ]
-  },
-  {
-    label: '🏷 Label Bottom-Left',
-    zones: [
-      { name: 'label_text', x: 0.03, y: 0.78, w: 0.45, h: 0.18 }
-    ]
-  },
-  {
-    label: '📋 3 Rows',
-    zones: [
-      { name: 'row_1', x: 0.05, y: 0.02,  w: 0.90, h: 0.14 },
-      { name: 'row_2', x: 0.05, y: 0.43,  w: 0.90, h: 0.14 },
-      { name: 'row_3', x: 0.05, y: 0.84,  w: 0.90, h: 0.14 }
-    ]
-  }
+  { label: '⬆ Top Caption',        zones: [{ name: 'top_text',    x: 0.05, y: 0.02, w: 0.90, h: 0.14 }] },
+  { label: '⬇ Bottom Caption',     zones: [{ name: 'bottom_text', x: 0.05, y: 0.84, w: 0.90, h: 0.14 }] },
+  { label: '↕ Top + Bottom',       zones: [{ name: 'top_text', x: 0.05, y: 0.02, w: 0.90, h: 0.14 }, { name: 'bottom_text', x: 0.05, y: 0.84, w: 0.90, h: 0.14 }] },
+  { label: '🔲 2×2 Grid',          zones: [{ name: 'top_left', x: 0.02, y: 0.02, w: 0.46, h: 0.46 }, { name: 'top_right', x: 0.52, y: 0.02, w: 0.46, h: 0.46 }, { name: 'bottom_left', x: 0.02, y: 0.52, w: 0.46, h: 0.46 }, { name: 'bottom_right', x: 0.52, y: 0.52, w: 0.46, h: 0.46 }] },
+  { label: '◼ Center Box',         zones: [{ name: 'center_text', x: 0.10, y: 0.35, w: 0.80, h: 0.30 }] },
+  { label: '🔛 Full Width Strip',  zones: [{ name: 'strip_text',  x: 0.00, y: 0.42, w: 1.00, h: 0.16 }] },
+  { label: '↔ Left + Right',       zones: [{ name: 'left_text',  x: 0.02, y: 0.10, w: 0.44, h: 0.80 }, { name: 'right_text', x: 0.54, y: 0.10, w: 0.44, h: 0.80 }] },
+  { label: '🗨 Speech Bubble',     zones: [{ name: 'bubble_text', x: 0.30, y: 0.03, w: 0.65, h: 0.22 }] },
+  { label: '🏷 Label Bottom-Left', zones: [{ name: 'label_text',  x: 0.03, y: 0.78, w: 0.45, h: 0.18 }] },
+  { label: '📋 3 Rows',            zones: [{ name: 'row_1', x: 0.05, y: 0.02, w: 0.90, h: 0.14 }, { name: 'row_2', x: 0.05, y: 0.43, w: 0.90, h: 0.14 }, { name: 'row_3', x: 0.05, y: 0.84, w: 0.90, h: 0.14 }] }
 ];
 
-// ─────────────────────────────────────────
-// Build preset chips
-// ─────────────────────────────────────────
 function buildPresetChips() {
   const scrollEl = document.getElementById('presets-scroll');
   let scrolling = false, scrollTimer = null;
-
   scrollEl.addEventListener('scroll', () => {
     scrolling = true;
     clearTimeout(scrollTimer);
     scrollTimer = setTimeout(() => { scrolling = false; }, 150);
   }, { passive: true });
-
   PRESETS.forEach((preset, i) => {
     const chip = document.createElement('button');
     chip.className = 'preset-chip';
     chip.textContent = preset.label;
-
-    chip.addEventListener('touchend', e => {
-      if (scrolling) { e.preventDefault(); return; }
-    }, { passive: false });
-
-    chip.addEventListener('click', () => {
-      if (scrolling) return;
-      applyPreset(i);
-    });
-
+    chip.addEventListener('touchend', e => { if (scrolling) { e.preventDefault(); return; } }, { passive: false });
+    chip.addEventListener('click', () => { if (!scrolling) applyPreset(i); });
     scrollEl.appendChild(chip);
   });
 }
 buildPresetChips();
 
 function applyPreset(index) {
-  if (!img.src || !imgNatW) { showToast('Image not loaded yet'); return; }
-  // Clear existing zones first
+  if (!imgNatW) { showToast('Image not loaded yet'); return; }
   clearAll(true);
-  const preset = PRESETS[index];
-  preset.zones.forEach(z => {
-    const px = z.x * imgDisplayW;
-    const py = z.y * imgDisplayH;
-    const pw = z.w * imgDisplayW;
-    const ph = z.h * imgDisplayH;
-    addZone(px, py, pw, ph, z.name);
+  PRESETS[index].zones.forEach(z => {
+    addZone(z.x * imgDisplayW, z.y * imgDisplayH, z.w * imgDisplayW, z.h * imgDisplayH, z.name);
   });
-  showToast('Applied: ' + preset.label.replace(/^.\s/, ''));
+  showToast('Applied: ' + PRESETS[index].label.replace(/^.\s/, ''));
 }
 
 // ─────────────────────────────────────────
-// Image loading — URL only, no file upload
+// IMAGE LOADING
+// Poll until Telegram's stable height stops changing, then load.
+// This prevents fitImage() from measuring a half-expanded viewport.
 // ─────────────────────────────────────────
+function waitForStableHeight(cb) {
+  if (!tg) { setTimeout(cb, 50); return; }
+  let prev = 0, stable = 0;
+  const check = () => {
+    const h = tg.viewportStableHeight || tg.viewportHeight || window.innerHeight;
+    if (h > 100 && h === prev) {
+      stable++;
+      if (stable >= 3) { cb(); return; } // same height 3 checks in a row = stable
+    } else {
+      stable = 0;
+    }
+    prev = h;
+    setTimeout(check, 50);
+  };
+  // Start checking after a brief initial delay
+  setTimeout(check, 100);
+}
+
 function loadImageFromUrl() {
   const params = new URLSearchParams(window.location.search);
   const tempUrl = params.get('image_url');
@@ -176,26 +156,19 @@ function loadImageFromUrl() {
     imgNatW = img.naturalWidth;
     imgNatH = img.naturalHeight;
 
-    fitImage();               // size image to available space before showing
-    img.style.display = 'block';
-    document.getElementById('placeholder').style.display = 'none';
-
-    imgDisplayW = img.clientWidth;
-    imgDisplayH = img.clientHeight;
-
+    // Reveal bottom panel controls FIRST so they consume their space
     document.getElementById('top-actions').style.display = '';
     document.getElementById('presets-section').classList.add('visible');
     document.getElementById('actions').style.display = '';
     document.getElementById('hint').style.display = '';
 
-    // Bottom panel just grew — re-fit image to new available height
-    requestAnimationFrame(() => {
+    // Double rAF: first frame triggers layout, second frame measures result
+    requestAnimationFrame(() => requestAnimationFrame(() => {
       fitImage();
-      imgDisplayW = img.clientWidth;
-      imgDisplayH = img.clientHeight;
-    });
-
-    currentImageHash = SparkMD5.hash(tempUrl);
+      img.style.display = 'block';
+      document.getElementById('placeholder').style.display = 'none';
+      currentImageHash = SparkMD5.hash(tempUrl);
+    }));
   };
 
   img.onerror = () => {
@@ -205,27 +178,23 @@ function loadImageFromUrl() {
   };
 }
 
-onAppReady(loadImageFromUrl);
+waitForStableHeight(() => {
+  applyViewportHeight();
+  loadImageFromUrl();
+});
 
 // ─────────────────────────────────────────
 // Core helpers
 // ─────────────────────────────────────────
 function getScale() {
-  imgDisplayW = img.clientWidth;
-  imgDisplayH = img.clientHeight;
   return { sx: imgNatW / imgDisplayW, sy: imgNatH / imgDisplayH };
 }
 
 function toggleAddMode() {
   addMode = !addMode;
   const btn = document.getElementById('add-zone-btn');
-  if (addMode) {
-    btn.textContent = '✕ Cancel';
-    btn.classList.add('cancel-mode');
-  } else {
-    btn.textContent = '＋ Add Zone';
-    btn.classList.remove('cancel-mode');
-  }
+  btn.textContent = addMode ? '✕ Cancel' : '＋ Add Zone';
+  btn.classList.toggle('cancel-mode', addMode);
   container.style.cursor = addMode ? 'crosshair' : 'default';
 }
 
@@ -261,14 +230,10 @@ function addZone(px, py, pw, ph, forceName) {
   const id = 'z' + zoneCounter;
   const { sx, sy } = getScale();
   const zone = {
-    id,
-    name: forceName || ('text_' + zoneCounter),
-    align: 'center',
-    rotation: 0,
-    x: Math.round(px * sx),
-    y: Math.round(py * sy),
-    w: Math.round(pw * sx),
-    h: Math.round(ph * sy)
+    id, name: forceName || ('text_' + zoneCounter),
+    align: 'center', rotation: 0,
+    x: Math.round(px * sx), y: Math.round(py * sy),
+    w: Math.round(pw * sx), h: Math.round(ph * sy)
   };
   zones.push(zone);
   renderZone(zone);
@@ -300,7 +265,7 @@ function renderZone(zone) {
   const delBtn = document.createElement('button');
   delBtn.className = 'zone-delete';
   delBtn.textContent = '×';
-  delBtn.addEventListener('click', e => { e.stopPropagation(); deleteZone(zone.id); });
+  delBtn.addEventListener('click',    e => { e.stopPropagation(); deleteZone(zone.id); });
   delBtn.addEventListener('touchend', e => { e.preventDefault(); e.stopPropagation(); deleteZone(zone.id); });
   el.appendChild(delBtn);
 
@@ -352,10 +317,7 @@ function selectZone(id) {
   });
   selectedId = id;
   const el = document.getElementById('zone-' + id);
-  if (el) {
-    el.classList.add('selected');
-    el.querySelector('.zone-label')?.classList.add('selected');
-  }
+  if (el) { el.classList.add('selected'); el.querySelector('.zone-label')?.classList.add('selected'); }
   const zone = zones.find(z => z.id === id);
   if (zone) showEditor(zone);
 }
@@ -365,12 +327,12 @@ function showEditor(zone) {
   document.getElementById('zone-name').value = zone.name;
   document.getElementById('zone-rotate').value = zone.rotation;
   document.getElementById('rotate-val').textContent = zone.rotation + '°';
-  requestAnimationFrame(() => { fitImage(); zones.forEach(z => reRenderZone(z)); });
+  scheduleRefit();
 }
 
 function hideEditor() {
   document.getElementById('zone-editor').classList.remove('visible');
-  requestAnimationFrame(() => { fitImage(); zones.forEach(z => reRenderZone(z)); });
+  scheduleRefit();
 }
 
 document.getElementById('zone-name').addEventListener('input', e => {
@@ -418,11 +380,7 @@ function startRotate(e, id) {
   const cy = rect.top + rect.height / 2;
   const cp = getClientPos(e);
   const zone = zones.find(z => z.id === id);
-  rotateStart = {
-    cx, cy,
-    startAngle: Math.atan2(cp.y - cy, cp.x - cx) * 180 / Math.PI,
-    initRotation: zone.rotation
-  };
+  rotateStart = { cx, cy, startAngle: Math.atan2(cp.y - cy, cp.x - cx) * 180 / Math.PI, initRotation: zone.rotation };
   selectZone(id);
 }
 
@@ -443,7 +401,6 @@ function onMove(e) {
     zone.y = Math.max(0, Math.min(Math.round((dragStart.zy + pos.y - dragStart.my) * sy), imgNatH - zone.h));
     reRenderZone(zone);
   }
-
   if (resizing) {
     const pos = getEventPos(e, container);
     const zone = zones.find(z => z.id === resizing);
@@ -451,7 +408,6 @@ function onMove(e) {
     zone.h = Math.max(20, Math.min(Math.round((resizeStart.zh + pos.y - resizeStart.my) * sy), imgNatH - zone.y));
     reRenderZone(zone);
   }
-
   if (rotating) {
     const cp = getClientPos(e);
     const angle = Math.atan2(cp.y - rotateStart.cy, cp.x - rotateStart.cx) * 180 / Math.PI;
@@ -492,18 +448,14 @@ function exportTemplate() {
     image_width: imgNatW,
     image_height: imgNatH,
     text_zones: zones.map((z, i) => ({
-      id: i + 1,
-      name: z.name,
-      x: z.x, y: z.y,
-      w: z.w, h: z.h,
-      rotation: z.rotation,
-      align: z.align
+      id: i + 1, name: z.name,
+      x: z.x, y: z.y, w: z.w, h: z.h,
+      rotation: z.rotation, align: z.align
     }))
   };
   const json = JSON.stringify(output);
   if (tg && tg.sendData) {
-    tg.sendData(json);
-    tg.close();
+    tg.sendData(json); tg.close();
   } else {
     navigator.clipboard.writeText(JSON.stringify(output, null, 2))
       .then(() => showToast('JSON copied!'))
@@ -516,34 +468,3 @@ function showToast(msg) {
   t.textContent = msg; t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 2200);
 }
-
-// ─────────────────────────────────────────
-// Fit image inside available canvas-wrap space
-// so it never overflows or hides behind the bottom panel
-// ─────────────────────────────────────────
-function fitImage() {
-  const wrap = document.getElementById('canvas-wrap');
-  const wrapW = wrap.clientWidth;
-  const wrapH = wrap.clientHeight;
-  if (!imgNatW || !imgNatH || !wrapW || !wrapH) return;
-
-  const scale = Math.min(wrapW / imgNatW, wrapH / imgNatH);
-  const dispW = Math.floor(imgNatW * scale);
-  const dispH = Math.floor(imgNatH * scale);
-
-  img.style.width  = dispW + 'px';
-  img.style.height = dispH + 'px';
-  img.style.maxWidth  = 'none';
-  img.style.maxHeight = 'none';
-
-  imgDisplayW = dispW;
-  imgDisplayH = dispH;
-}
-
-window.addEventListener('resize', () => {
-  if (!img.src || !imgNatW) return;
-  fitImage();
-  imgDisplayW = img.clientWidth;
-  imgDisplayH = img.clientHeight;
-  zones.forEach(z => reRenderZone(z));
-});

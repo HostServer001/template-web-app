@@ -5,8 +5,8 @@
   --accent: #FFD700; --accent2: #ff6b35; --danger: #e74c3c;
   --success: #2ecc71; --radius: 10px;
 }
-body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; height: 100vh; height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
-#app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; overflow: hidden; }
+body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; overflow: hidden; display: flex; flex-direction: column; }
+#app { display: flex; flex-direction: column; height: var(--tg-viewport-stable-height, var(--tg-viewport-height, 100dvh)); overflow: hidden; }
 
 .header { padding: 10px 16px 8px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; background: var(--surface); flex-shrink: 0; }
 .header-title { font-size: 15px; font-weight: 700; letter-spacing: -0.3px; }

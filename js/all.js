@@ -153,10 +153,13 @@ function loadImageFromUrl() {
   img.style.display = 'none';
 
   img.onload = () => {
-    img.style.display = 'block';
-    document.getElementById('placeholder').style.display = 'none';
     imgNatW = img.naturalWidth;
     imgNatH = img.naturalHeight;
+
+    fitImage();               // size image to available space before showing
+    img.style.display = 'block';
+    document.getElementById('placeholder').style.display = 'none';
+
     imgDisplayW = img.clientWidth;
     imgDisplayH = img.clientHeight;
 
@@ -485,6 +488,33 @@ function showToast(msg) {
   setTimeout(() => t.classList.remove('show'), 2200);
 }
 
+// ─────────────────────────────────────────
+// Fit image inside available canvas-wrap space
+// so it never overflows or hides behind the bottom panel
+// ─────────────────────────────────────────
+function fitImage() {
+  const wrap = document.getElementById('canvas-wrap');
+  const wrapW = wrap.clientWidth;
+  const wrapH = wrap.clientHeight;
+  if (!imgNatW || !imgNatH || !wrapW || !wrapH) return;
+
+  const scale = Math.min(wrapW / imgNatW, wrapH / imgNatH);
+  const dispW = Math.floor(imgNatW * scale);
+  const dispH = Math.floor(imgNatH * scale);
+
+  img.style.width  = dispW + 'px';
+  img.style.height = dispH + 'px';
+  img.style.maxWidth  = 'none';
+  img.style.maxHeight = 'none';
+
+  imgDisplayW = dispW;
+  imgDisplayH = dispH;
+}
+
 window.addEventListener('resize', () => {
-  if (img.src) zones.forEach(z => reRenderZone(z));
+  if (!img.src || !imgNatW) return;
+  fitImage();
+  imgDisplayW = img.clientWidth;
+  imgDisplayH = img.clientHeight;
+  zones.forEach(z => reRenderZone(z));
 });

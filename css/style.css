@@ -5,17 +5,44 @@
   --accent: #FFD700; --accent2: #ff6b35; --danger: #e74c3c;
   --success: #2ecc71; --radius: 10px;
 }
-body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; min-height: 100vh; display: flex; flex-direction: column; }
-#app { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; height: 100vh; height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
+#app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; overflow: hidden; }
 
-.header { padding: 12px 16px 10px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; background: var(--surface); flex-shrink: 0; }
-.header-title { font-size: 16px; font-weight: 700; letter-spacing: -0.3px; }
+.header { padding: 10px 16px 8px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; background: var(--surface); flex-shrink: 0; }
+.header-title { font-size: 15px; font-weight: 700; letter-spacing: -0.3px; }
 .header-title span { color: var(--accent); }
 .zone-count { background: var(--accent); color: #000; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 20px; }
 
-#canvas-wrap { flex: 1; overflow: hidden; position: relative; background: #111; display: flex; align-items: center; justify-content: center; }
-#canvas-container { position: relative; display: inline-block; user-select: none; touch-action: none; }
-#meme-img { display: block; max-width: 100%; max-height: 100%; pointer-events: none; }
+/* ── Canvas area: fills all space between header and bottom panel ── */
+#canvas-wrap {
+  flex: 1 1 0;
+  min-height: 0;          /* critical — lets flex child shrink below content size */
+  overflow: hidden;
+  position: relative;
+  background: #111;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#canvas-container {
+  position: relative;
+  display: inline-block;
+  user-select: none;
+  touch-action: none;
+  /* ensure the container never exceeds the canvas-wrap bounds */
+  max-width: 100%;
+  max-height: 100%;
+}
+#meme-img {
+  display: block;
+  /* fill canvas-wrap as much as possible without overflow */
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  pointer-events: none;
+}
 
 .placeholder { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: var(--muted); }
 .placeholder-icon { width: 56px; height: 56px; border: 2px dashed var(--border); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; }
@@ -35,16 +62,23 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', syste
 .zone-delete { position: absolute; top: -10px; right: -10px; width: 20px; height: 20px; background: var(--danger); color: #fff; border: none; border-radius: 50%; font-size: 13px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; touch-action: manipulation; z-index: 10; }
 
 /* ── Bottom Panel ── */
-.bottom-panel { background: var(--surface); border-top: 1px solid var(--border); flex-shrink: 0; }
+.bottom-panel {
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+  /* prevent the panel from ever overflowing the screen */
+  overflow-y: auto;
+  max-height: 55vh;   /* hard cap so panel never swallows too much screen */
+}
 
 /* Hint bar */
-.hint { padding: 6px 16px; font-size: 12px; color: var(--muted); text-align: center; }
+.hint { padding: 5px 16px; font-size: 12px; color: var(--muted); text-align: center; }
 .hint strong { color: var(--accent); }
 
 /* Top action row: Add Zone button */
-#top-actions { padding: 10px 16px 0; }
+#top-actions { padding: 8px 16px 0; }
 #add-zone-btn {
-  width: 100%; padding: 10px 12px; border-radius: var(--radius);
+  width: 100%; padding: 9px 12px; border-radius: var(--radius);
   border: none; font-size: 13px; font-weight: 600; cursor: pointer;
   touch-action: manipulation; transition: opacity 0.15s;
   background: var(--accent); color: #000;
@@ -53,13 +87,13 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', syste
 #add-zone-btn.cancel-mode { background: var(--accent2); color: #fff; }
 
 /* Presets section */
-#presets-section { padding: 10px 16px 0; display: none; }
+#presets-section { padding: 8px 16px 0; display: none; }
 #presets-section.visible { display: block; }
-.presets-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+.presets-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
 .presets-scroll { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
 .presets-scroll::-webkit-scrollbar { display: none; }
 .preset-chip {
-  flex-shrink: 0; padding: 6px 12px; border-radius: 20px;
+  flex-shrink: 0; padding: 5px 11px; border-radius: 20px;
   background: var(--surface2); border: 1px solid var(--border);
   color: var(--text); font-size: 12px; font-weight: 600; cursor: pointer;
   touch-action: manipulation; transition: all 0.15s; white-space: nowrap;
@@ -67,18 +101,18 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', syste
 .preset-chip:hover, .preset-chip:active { background: var(--accent); color: #000; border-color: var(--accent); }
 
 /* Zone editor */
-#zone-editor { padding: 10px 16px 0; display: none; gap: 8px; flex-direction: column; }
+#zone-editor { padding: 8px 16px 0; display: none; gap: 7px; flex-direction: column; }
 #zone-editor.visible { display: flex; }
 .editor-row { display: flex; gap: 8px; align-items: center; }
-.editor-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; width: 60px; flex-shrink: 0; }
-.editor-input { flex: 1; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 7px 10px; font-size: 13px; outline: none; }
+.editor-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; width: 56px; flex-shrink: 0; }
+.editor-input { flex: 1; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 6px 10px; font-size: 13px; outline: none; }
 .editor-input:focus { border-color: var(--accent); }
 input[type=range] { flex: 1; accent-color: #3b82f6; }
 .rotation-val { font-size: 12px; color: #3b82f6; font-weight: 700; min-width: 36px; text-align: right; }
 
 /* Bottom action row */
-#actions { padding: 10px 16px 14px; display: flex; gap: 8px; }
-.btn { flex: 1; padding: 10px 12px; border-radius: var(--radius); border: none; font-size: 13px; font-weight: 600; cursor: pointer; touch-action: manipulation; transition: opacity 0.15s; }
+#actions { padding: 8px 16px 12px; display: flex; gap: 8px; }
+.btn { flex: 1; padding: 9px 12px; border-radius: var(--radius); border: none; font-size: 13px; font-weight: 600; cursor: pointer; touch-action: manipulation; transition: opacity 0.15s; }
 .btn:active { opacity: 0.75; }
 .btn-danger { background: var(--danger); color: #fff; }
 .btn-success { background: var(--success); color: #000; }

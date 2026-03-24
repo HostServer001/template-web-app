@@ -168,6 +168,7 @@ function loadImageFromUrl() {
       img.style.display = 'block';
       document.getElementById('placeholder').style.display = 'none';
       currentImageHash = params.get('image_hash') || SparkMD5.hash(tempUrl);
+      window.originalUploader = params.get('uploader') || null;
     }));
   };
 
@@ -445,6 +446,7 @@ function exportTemplate() {
   const output = {
     template_name: 'template_' + Date.now(),
     image_hash: currentImageHash,
+    uploader: window.originalUploader,   // add this
     image_width: imgNatW,
     image_height: imgNatH,
     text_zones: zones.map((z, i) => ({

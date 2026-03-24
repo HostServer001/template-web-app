@@ -167,7 +167,7 @@ function loadImageFromUrl() {
       fitImage();
       img.style.display = 'block';
       document.getElementById('placeholder').style.display = 'none';
-      currentImageHash = SparkMD5.hash(tempUrl);
+      currentImageHash = params.get('image_hash') || SparkMD5.hash(tempUrl);
     }));
   };
 

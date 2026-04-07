@@ -136,47 +136,74 @@ function waitForStableHeight(cb) {
   setTimeout(check, 100);
 }
 
-function loadImageFromUrl() {
+async function loadImageFromUrl() {
+  // Replace this with your actual Bot Token
+  const BOT_TOKEN = "8625830607:AAGVWk4LJ60jL5hRji-Z6YGRTqMWLktyhMc"; 
+  
   const params = new URLSearchParams(window.location.search);
-  const tempUrl = params.get('image_url');
+  // Renamed from tempUrl to file
+  const file = params.get('file_id'); 
 
-  if (!tempUrl) {
-    document.getElementById('placeholder').innerHTML =
-      '<div class="placeholder-icon">⚠️</div><p>No image_url provided</p>';
+  const placeholder = document.getElementById('placeholder');
+
+  if (!file) {
+    placeholder.innerHTML =
+      '<div class="placeholder-icon">⚠️</div><p>No file_id provided</p>';
     return;
   }
 
-  document.getElementById('placeholder').innerHTML =
-    '<div class="loader"></div><p>Loading image…</p>';
+  placeholder.innerHTML = '<div class="loader"></div><p>Fetching file info…</p>';
 
-  img.src = tempUrl;
-  img.style.display = 'none';
+  try {
+    // STEP 1: Get the file path from Telegram API
+    const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getFile?file_id=${file}`);
+    const data = await response.json();
 
-  img.onload = () => {
-    imgNatW = img.naturalWidth;
-    imgNatH = img.naturalHeight;
+    if (!data.ok) {
+      throw new Error(data.description || "Failed to get file path");
+    }
 
-    // Reveal bottom panel controls FIRST so they consume their space
-    document.getElementById('top-actions').style.display = '';
-    document.getElementById('presets-section').classList.add('visible');
-    document.getElementById('actions').style.display = '';
-    document.getElementById('hint').style.display = '';
+    const filePath = data.result.file_path;
+    // STEP 2: Construct the final CDN download URL
+    const downloadUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${filePath}`;
 
-    // Double rAF: first frame triggers layout, second frame measures result
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      fitImage();
-      img.style.display = 'block';
-      document.getElementById('placeholder').style.display = 'none';
-      currentImageHash = params.get('image_hash') || SparkMD5.hash(tempUrl);
-      window.originalUploader = params.get('uploader') || null;
-    }));
-  };
+    // Proceed with loading the image into the DOM
+    placeholder.innerHTML = '<div class="loader"></div><p>Loading image…</p>';
+    
+    img.src = downloadUrl;
+    img.style.display = 'none';
 
-  img.onerror = () => {
-    document.getElementById('placeholder').innerHTML =
-      '<div class="placeholder-icon">⚠️</div><p>Failed to load image</p>';
+    img.onload = () => {
+      imgNatW = img.naturalWidth;
+      imgNatH = img.naturalHeight;
+
+      // Reveal UI elements
+      document.getElementById('top-actions').style.display = '';
+      document.getElementById('presets-section').classList.add('visible');
+      document.getElementById('actions').style.display = '';
+      document.getElementById('hint').style.display = '';
+
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        fitImage();
+        img.style.display = 'block';
+        placeholder.style.display = 'none';
+        
+        // Use the downloadUrl for hashing if a hash isn't provided
+        currentImageHash = params.get('image_hash') || SparkMD5.hash(downloadUrl);
+        window.originalUploader = params.get('uploader') || null;
+      }));
+    };
+
+    img.onerror = () => {
+      throw new Error("Image source failed to load");
+    };
+
+  } catch (error) {
+    console.error(error);
+    placeholder.innerHTML =
+      `<div class="placeholder-icon">⚠️</div><p>${error.message}</p>`;
     showToast('Failed to load image!');
-  };
+  }
 }
 
 waitForStableHeight(() => {

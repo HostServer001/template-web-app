@@ -5,7 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>Meme Template Builder</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/spark-md5/3.0.2/spark-md5.min.js"></script>
+
+<!-- PyScript (replaces all.js) -->
+<link   rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css">
+<script type="module"    src="https://pyscript.net/releases/2024.1.1/core.js"></script>
+
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -30,20 +34,16 @@
       Tap <strong>＋ Add Zone</strong> then tap image &nbsp;·&nbsp; or pick a <strong>preset</strong> below
     </div>
 
-    <!-- Add Zone button — full width, consistent padding -->
     <div id="top-actions" style="display:none;">
-      <button id="add-zone-btn" onclick="toggleAddMode()">＋ Add Zone</button>
+      <!-- onclick now calls window.toggleAddMode set by Python -->
+      <button id="add-zone-btn" onclick="window.toggleAddMode()">＋ Add Zone</button>
     </div>
 
-    <!-- Predefined zone presets -->
     <div id="presets-section">
       <div class="presets-label">Quick Presets</div>
-      <div class="presets-scroll" id="presets-scroll">
-        <!-- chips injected by JS -->
-      </div>
+      <div class="presets-scroll" id="presets-scroll"></div>
     </div>
 
-    <!-- Zone editor -->
     <div id="zone-editor">
       <div class="editor-row">
         <span class="editor-label">Name</span>
@@ -56,16 +56,17 @@
       </div>
     </div>
 
-    <!-- Clear + Export -->
     <div id="actions" style="display:none;">
-      <button class="btn btn-danger" onclick="clearAll()">🗑 Clear</button>
-      <button class="btn btn-success" onclick="exportTemplate()">✓ Done &amp; Export</button>
+      <button class="btn btn-danger"  onclick="window.clearAll()">🗑 Clear</button>
+      <button class="btn btn-success" onclick="window.exportTemplate()">✓ Done &amp; Export</button>
     </div>
   </div>
 
   <div id="toast"></div>
 </div>
 
-<script src="js/all.js"></script>
+<!-- Python replaces all.js — src points to your .py file -->
+<script type="py" src="js/all.py"></script>
+
 </body>
 </html>

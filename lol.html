@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css">
+  <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
+</head>
+<body>
+
+<div id="box" style="width:100px;height:100px;background:red;position:absolute;cursor:grab;">
+</div>
+
+<script type="py">
+from pyscript import document
+from pyodide.ffi import create_proxy  # 👈 use pyodide.ffi not pyscript.ffi
+
+box = document.querySelector("#box")
+dragging = False
+
+def on_mousedown(e):
+    global dragging
+    dragging = True
+
+def on_mousemove(e):
+    if dragging:
+        box.style.left = f"{e.clientX - 50}px"
+        box.style.top  = f"{e.clientY - 50}px"
+
+def on_mouseup(e):
+    global dragging
+    dragging = False
+
+box.addEventListener("mousedown", create_proxy(on_mousedown))
+document.addEventListener("mousemove", create_proxy(on_mousemove))
+document.addEventListener("mouseup",   create_proxy(on_mouseup))
+</script>
+
+</body>
+</html>

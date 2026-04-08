@@ -141,8 +141,9 @@ async function loadImageFromUrl() {
   const BOT_TOKEN = "8625830607:AAGVWk4LJ60jL5hRji-Z6YGRTqMWLktyhMc"; 
   
   const params = new URLSearchParams(window.location.search);
-  // Renamed from tempUrl to file
-  const file = params.get('file_id'); 
+
+  currentFileId = params.get('file_id');
+  const file = currentFileId; 
 
   const placeholder = document.getElementById('placeholder');
 
@@ -188,8 +189,6 @@ async function loadImageFromUrl() {
         img.style.display = 'block';
         placeholder.style.display = 'none';
         
-        // Use the downloadUrl for hashing if a hash isn't provided
-        currentImageHash = params.get('image_hash') || SparkMD5.hash(downloadUrl);
         window.originalUploader = params.get('uploader') || null;
       }));
     };
@@ -472,7 +471,7 @@ function exportTemplate() {
   if (zones.length === 0) { showToast('Add at least one text zone!'); return; }
   const output = {
     template_name: 'template_' + Date.now(),
-    image_hash: currentImageHash,
+    file_id: currentFileId,
     uploader: window.originalUploader,   // add this
     image_width: imgNatW,
     image_height: imgNatH,
